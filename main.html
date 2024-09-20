@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fruit Basket Physics</title>
+  <style>
+    canvas {
+      border: 1px solid #ccc;
+      display: block;
+      margin: 0 auto;
+      background-color: #f0f8ff;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="world"></canvas>
+
+  <!-- Include Matter.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <script>
+    // Alias Matter.js modules
+    const Engine = Matter.Engine,
+          Render = Matter.Render,
+          World = Matter.World,
+          Bodies = Matter.Bodies,
+          Body = Matter.Body,
+          Events = Matter.Events;
+
+    // Create an engine
+    const engine = Engine.create();
+
+    // Create a renderer
+    const canvas = document.getElementById('world');
+    canvas.width = 800;
+    canvas.height = 600;
+
+    const context = canvas.getContext('2d');
+
+    // Create basket walls
+    const basketLeft = Bodies.rectangle(300, 500, 20, 200, { isStatic: true, render: { fillStyle: '#8B4513' } });
+    const basketRight = Bodies.rectangle(500, 500, 20, 200, { isStatic: true, render: { fillStyle: '#8B4513' } });
+    const basketBottom = Bodies.rectangle(400, 590, 200, 20, { isStatic: true, render: { fillStyle: '#8B4513' } });
+
+    World.add(engine.world, [basketLeft, basketRight, basketBottom]);
+
+    // Function to get random color
+    function getRandomColor() {
+      const colors = ['#FF6347', '#FFD700', '#ADFF2F', '#1E90FF', '#FF69B4'];
+      return colors[Math.floor(Math.random() * colors.length)];
+    }
+
+    // Function to create a fruit
+    function createFruit(x, y, radius = 30, options = {}) {
+      const defaultOptions = {
+        restitution: 0.6,
+        friction: 0.3,
+        label: 'fruit',
+        render: {
+          fillStyle: getRandomColor()
+        }
+      };
+      return Bodies.circle(x, y, radius, { ...defaultOptions, ...options });
+    }
+
+    // Function to create a stem
+    function createStem(fruit) {
+      const stem = Bodies.rectangle(fruit.position.x, fruit.position.y - fruit.circleRadius - 7.5, 5, 15, {
+        isStatic: false,
+        friction: 0.1,
+        label: 'stem',
+        render: {
+          fillStyle: '#228B22'
+        }
+      });
+
+      const constraint = Matter.Constraint.create({
+        bodyA: fruit,
+        pointA: { x: 0, y: -fruit.circleRadius },
+        bodyB: stem,
+        pointB: { x: 0, y: 7.5 },
+        length: 0,
+        stiffness: 0.9
+      });
+
+      World.add(engine.world, [stem, constraint]);
+    }
+
+    // Create multiple fruits and add stems
+    for (let i = 0; i < 5; i++) {
+      const fruit = createFruit(400, 100 - i * 60);
+      World.add(engine.world, fruit);
+      createStem(fruit);
+    }
+
+    // Run the engine
+    Engine.run(engine);
+
+    // Render loop
+    (function render() {
+      const bodies = Matter.Composite.allBodies(engine.world);
+
+      window.requestAnimationFrame(render);
+
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      context.beginPath();
+
+      bodies.forEach(body => {
+        const vertices = body.vertices;
+
+        context.moveTo(vertices[0].x, vertices[0].y);
+        for (let j = 1; j < vertices.length; j++) {
+          context.lineTo(vertices[j].x, vertices[j].y);
+        }
+        context.lineTo(vertices[0].x, vertices[0].y);
+      });
+
+      context.lineWidth = 1;
+      context.strokeStyle = '#999';
+      context.stroke();
+
+      // Optional: Fill bodies with colors
+      bodies.forEach(body => {
+        context.beginPath();
+        const vertices = body.vertices;
+
+        context.moveTo(vertices[0].x, vertices[0].y);
+        for (let j = 1; j < vertices.length; j++) {
+          context.lineTo(vertices[j].x, vertices[j].y);
+        }
+        context.closePath();
+        context.fillStyle = body.render.fillStyle || '#FFFFFF';
+        context.fill();
+      });
+    })();
+
+    // Collision event for stems poking fruits
+    Events.on(engine, 'collisionStart', event => {
+      const pairs = event.pairs;
+
+      pairs.forEach(pair => {
+        let stem, fruit;
+
+        if (pair.bodyA.label === 'stem' && pair.bodyB.label === 'fruit') {
+          stem = pair.bodyA;
+          fruit = pair.bodyB;
+        } else if (pair.bodyB.label === 'stem' && pair.bodyA.label === 'fruit') {
+          stem = pair.bodyB;
+          fruit = pair.bodyA;
+        }
+
+        if (stem && fruit) {
+          createHoleInFruit(fruit);
+        }
+      });
+    });
+
+    // Function to create a hole in the fruit
+    function createHoleInFruit(fruit) {
+      // Prevent multiple holes
+      if (fruit.isHoleCreated) return;
+      fruit.isHoleCreated = true;
+
+      // Remove the original fruit
+      World.remove(engine.world, fruit);
+
+      // Create a new, smaller fruit to simulate a hole
+      const newFruit = Bodies.circle(fruit.position.x, fruit.position.y, fruit.circleRadius * 0.8, {
+        restitution: 0.6,
+        friction: 0.3,
+        label: 'fruit',
+        render: {
+          fillStyle: '#B22222' // Different color to indicate damage
+        }
+      });
+
+      World.add(engine.world, newFruit);
+
+      // Optionally, create debris or effects
+    }
+  </script>
+</body>
+  </html>
