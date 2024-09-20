@@ -1,0 +1,9 @@
+version: 1
+staticSites:
+  - name: Naughty-Data-Structures
+    publishPath: /
+    buildCommand: ''
+    autoDeploy: true
+    branches:
+      - main
+      
